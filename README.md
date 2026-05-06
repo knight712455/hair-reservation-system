@@ -1,5 +1,14 @@
 # Hair Reservation System
 
+
+##  프로젝트 개요
+
+Hair Reservation System은 미용실 예약 과정에서 발생할 수 있는  
+**중복 예약 및 동시성 문제를 해결하기 위해 개발된 백엔드 시스템입니다.**
+
+특히 동일 시간대에 여러 사용자가 동시에 예약을 시도할 경우  
+데이터 정합성이 깨지는 문제를 해결하는 데 초점을 두었습니다.
+
 ## 1. 서비스 소개
 
 Hair Reservation System은 미용실 예약을 위한 백엔드 API 서버입니다.
@@ -135,21 +144,31 @@ end=2026-05-04T11:00:00
 * 예약 상태는 CONFIRMED / CANCELED 로 구분
 
 ---
+## ⚡ 동시성 문제 해결
 
-##  7. 동시성 처리
+### 문제 상황
+동일한 시간대에 여러 사용자가 동시에 예약을 요청할 경우  
+중복 예약이 발생하는 문제가 존재했습니다.
 
-### 문제
+예:
+- 요청 A: 10:00~11:00 예약
+- 요청 B: 10:00~11:00 예약
+→ 동시에 실행되면 둘 다 성공 가능
 
-동시에 여러 요청이 들어올 경우 동일 시간대 예약이 중복 생성되는 문제가 발생
+---
 
-### 해결
+### 원인
+예약 생성 전 중복 체크를 수행하지만,  
+조회와 저장 사이에 시간차가 발생하여 race condition 발생
 
-* **Pessimistic Lock 적용**
-* 트랜잭션 내부에서 충돌 체크
+---
+
+### 해결 방법
+DB 레벨에서 **Pessimistic Lock**을 적용하여  
+동시에 같은 리소스에 접근하는 것을 차단
 
 ```java
-@Lock(LockModeType.PESSIMISTIC_WRITE)
-```
+
 
 ---
 
@@ -207,16 +226,17 @@ start < 기존 end AND end > 기존 start
 INSERT INTO user (name) VALUES ('유저1');
 INSERT INTO resource (name) VALUES ('디자이너1');
 ```
-
-### API 테스트
+```md
+## ▶ 실행 방법
 
 ```bash
+./gradlew bootRun
+
 # 예약 생성
 curl -X POST "http://localhost:8080/reservations?userId=1&resourceId=1&start=2026-05-04T10:00:00&end=2026-05-04T11:00:00"
 
-# 조회
+# 예약 조회
 curl "http://localhost:8080/reservations?page=0&size=10"
 
-# 취소
+# 예약 취소
 curl -X PATCH http://localhost:8080/reservations/1/cancel
-```
