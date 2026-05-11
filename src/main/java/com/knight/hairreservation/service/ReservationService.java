@@ -1,14 +1,20 @@
 package com.knight.hairreservation.service;
 
+import com.knight.hairreservation.dto.ReservationRequest;
 import com.knight.hairreservation.dto.ReservationResponse;
-import com.knight.hairreservation.entity.*;
-import com.knight.hairreservation.repository.*;
+import com.knight.hairreservation.entity.Reservation;
+import com.knight.hairreservation.entity.ReservationStatus;
+import com.knight.hairreservation.entity.Resource;
+import com.knight.hairreservation.entity.User;
+import com.knight.hairreservation.repository.ReservationRepository;
+import com.knight.hairreservation.repository.ResourceRepository;
+import com.knight.hairreservation.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -19,64 +25,96 @@ public class ReservationService {
     private final UserRepository userRepository;
     private final ResourceRepository resourceRepository;
 
-    // ✅ 예약 생성
+    // 예약 생성
     @Transactional
-    public Reservation createReservation(
-            Long userId,
-            Long resourceId,
-            LocalDateTime start,
-            LocalDateTime end
+    public ReservationResponse create(
+            ReservationRequest request
     ) {
 
-        // 🔥 겹침 체크 + 락
+        System.out.println("서비스 시작");
+
+        User user = userRepository.findById(request.getUserId())
+                .orElseThrow(() ->
+                        new IllegalArgumentException("유저 없음")
+                );
+
+        System.out.println("유저 조회 완료");
+
+        Resource resource = resourceRepository.findById(request.getResourceId())
+                .orElseThrow(() ->
+                        new IllegalArgumentException("디자이너 없음")
+                );
+
+        System.out.println("디자이너 조회 완료");
+
+        // 시간 겹침 체크
         List<Reservation> conflicts =
-                reservationRepository.findConflicts(resourceId, start, end);
+                reservationRepository.findConflicts(
+                        request.getResourceId(),
+                        request.getStart(),
+                        request.getEnd()
+                );
 
         if (!conflicts.isEmpty()) {
-            throw new RuntimeException("이미 예약된 시간입니다.");
+            throw new IllegalArgumentException("이미 예약된 시간입니다.");
         }
 
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("유저 없음"));
+        System.out.println("충돌 검사 완료");
 
-        Resource resource = resourceRepository.findById(resourceId)
-                .orElseThrow(() -> new RuntimeException("리소스 없음"));
+        Reservation reservation = new Reservation();
 
-        Reservation reservation = Reservation.builder()
-                .user(user)
-                .resource(resource)
-                .slotStart(start)
-                .slotEnd(end)
-                .status("CONFIRMED")
-                .build();
+        reservation.setUser(user);
+        reservation.setResource(resource);
 
-        return reservationRepository.save(reservation);
+        reservation.setSlotStart(request.getStart());
+        reservation.setSlotEnd(request.getEnd());
+
+        reservation.setStatus(ReservationStatus.CONFIRMED);
+
+        System.out.println("저장 직전");
+
+        Reservation saved =
+                reservationRepository.save(reservation);
+
+        System.out.println("저장 완료");
+
+        return new ReservationResponse(
+                saved.getId(),
+                saved.getUser().getName(),
+                saved.getResource().getName(),
+                saved.getSlotStart(),
+                saved.getSlotEnd(),
+                saved.getStatus().name()
+        );
     }
 
-    // ✅ 예약 취소
+    // 예약 조회
+    @Transactional(readOnly = true)
+    public Page<ReservationResponse> getReservations(
+            Pageable pageable
+    ) {
+
+        return reservationRepository.findAll(pageable)
+                .map(r -> new ReservationResponse(
+                        r.getId(),
+                        r.getUser().getName(),
+                        r.getResource().getName(),
+                        r.getSlotStart(),
+                        r.getSlotEnd(),
+                        r.getStatus().name()
+                ));
+    }
+
+    // 예약 취소
     @Transactional
     public void cancelReservation(Long id) {
 
-        Reservation reservation = reservationRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("예약 없음"));
+        Reservation reservation =
+                reservationRepository.findById(id)
+                        .orElseThrow(() ->
+                                new IllegalArgumentException("예약 없음")
+                        );
 
-        if ("CANCELED".equals(reservation.getStatus())) {
-            throw new RuntimeException("이미 취소된 예약입니다.");
-        }
-
-        reservation.setStatus("CANCELED");
-    }
-
-    // ✅ 예약 조회 (페이징)
-    public Page<ReservationResponse> getReservations(Pageable pageable) {
-        return reservationRepository.findAll(pageable)
-                .map(r -> ReservationResponse.builder()
-                        .id(r.getId())
-                        .userName(r.getUser().getName())
-                        .resourceName(r.getResource().getName())
-                        .slotStart(r.getSlotStart())
-                        .slotEnd(r.getSlotEnd())
-                        .status(r.getStatus())
-                        .build());
+        reservation.setStatus(ReservationStatus.CANCELED);
     }
 }

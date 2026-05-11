@@ -1,18 +1,23 @@
 package com.knight.hairreservation.dto;
 
-import lombok.Builder;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 import java.time.LocalDateTime;
 
 @Getter
-@Builder
+@AllArgsConstructor
 public class ReservationResponse {
 
     private Long id;
+
     private String userName;
+
     private String resourceName;
+
     private LocalDateTime slotStart;
+
     private LocalDateTime slotEnd;
+
     private String status;
 }
