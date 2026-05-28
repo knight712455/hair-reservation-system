@@ -14,8 +14,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import com.knight.hairreservation.dto.TimeSlotResponse;
 import java.util.List;
+import java.time.LocalDate;
+
 
 @Service
 @RequiredArgsConstructor
@@ -28,12 +30,16 @@ public class ReservationService {
     // 예약 생성
     @Transactional
     public ReservationResponse create(
-            ReservationRequest request
+
+            ReservationRequest request,
+
+            Long userId
+
     ) {
 
         System.out.println("서비스 시작");
 
-        User user = userRepository.findById(request.getUserId())
+        User user = userRepository.findById(userId)
                 .orElseThrow(() ->
                         new IllegalArgumentException("유저 없음")
                 );
@@ -116,5 +122,95 @@ public class ReservationService {
                         );
 
         reservation.setStatus(ReservationStatus.CANCELED);
+    }
+    public Page<ReservationResponse>
+    getReservationsByResource(
+
+            Long resourceId,
+            Pageable pageable
+
+    ) {
+
+        return reservationRepository
+                .findByResourceId(
+                        resourceId,
+                        pageable
+                )
+                .map(r -> new ReservationResponse(
+
+                        r.getId(),
+                        r.getUser().getName(),
+                        r.getResource().getName(),
+                        r.getSlotStart(),
+                        r.getSlotEnd(),
+                        r.getStatus().name()
+
+                ));
+    }
+    public List<TimeSlotResponse>
+    getTimeSlots(
+
+            Long resourceId,
+            LocalDate date
+
+    ) {
+
+        List<String> times = List.of(
+
+                "10:00",
+                "11:00",
+                "12:00",
+                "13:00",
+                "14:00",
+                "15:00",
+                "16:00",
+                "17:00"
+
+        );
+
+        List<Reservation> reservations =
+                reservationRepository.findAll();
+
+        return times.stream()
+
+                .map(time -> {
+
+                    boolean reserved =
+
+                            reservations.stream()
+
+                                    .anyMatch(r ->
+
+                                            r.getStatus().name()
+                                                    .equals("CONFIRMED")
+
+                                                    &&
+
+                                                    r.getResource().getId()
+                                                            .equals(resourceId)
+
+                                                    &&
+
+                                                    r.getSlotStart()
+                                                            .toLocalDate()
+                                                            .equals(date)
+
+                                                    &&
+
+                                                    r.getSlotStart()
+                                                            .toLocalTime()
+                                                            .toString()
+                                                            .startsWith(time)
+
+                                    );
+
+                    return new TimeSlotResponse(
+                            time,
+                            !reserved
+                    );
+
+                })
+
+                .toList();
     }
 }

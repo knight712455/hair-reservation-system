@@ -9,7 +9,6 @@ import java.time.LocalDateTime;
 @Setter
 public class ReservationRequest {
 
-    private Long userId;
     private Long resourceId;
 
     private LocalDateTime start;

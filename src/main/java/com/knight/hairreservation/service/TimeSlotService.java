@@ -65,4 +65,72 @@ public class TimeSlotService {
 
         }).toList();
     }
+    public List<TimeSlotResponse>
+    getTimeSlots(
+
+            Long resourceId,
+            LocalDate date
+
+    ) {
+
+        List<String> times = List.of(
+
+                "10:00",
+                "11:00",
+                "12:00",
+                "13:00",
+                "14:00",
+                "15:00",
+                "16:00",
+                "17:00"
+
+        );
+
+        List<Reservation> reservations =
+
+                reservationRepository
+                        .findAll();
+
+        return times.stream()
+
+                .map(time -> {
+
+                    boolean reserved =
+
+                            reservations.stream()
+
+                                    .anyMatch(r ->
+
+                                            r.getStatus().name()
+                                                    .equals("CONFIRMED")
+
+                                                    &&
+
+                                                    r.getResource().getId()
+                                                            .equals(resourceId)
+
+                                                    &&
+
+                                                    r.getSlotStart()
+                                                            .toLocalDate()
+                                                            .equals(date)
+
+                                                    &&
+
+                                                    r.getSlotStart()
+                                                            .toLocalTime()
+                                                            .toString()
+                                                            .startsWith(time)
+
+                                    );
+
+                    return new TimeSlotResponse(
+                            time,
+                            !reserved
+                    );
+
+                })
+
+                .toList();
+    }
 }
